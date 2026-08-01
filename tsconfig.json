@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target":            "ES2022",
+    "module":            "NodeNext",
+    "moduleResolution":  "NodeNext",
+    "strict":            true,
+    "skipLibCheck":      true,
+    "paths": {
+      "@agentic-trading/shared": ["./types/engine-sdk.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "tsup.config.ts"]
+}

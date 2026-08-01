@@ -1,0 +1,19 @@
+{
+  "name": "my-engine",
+  "version": "1.0.0",
+  "description": "Custom quant engine for the Agentic Trader platform",
+  "type": "module",
+  "scripts": {
+    "build":         "tsup && node scripts/gen-manifest.mjs",
+    "build:esbuild": "esbuild src/engine.ts --bundle --platform=node --format=esm --external:events --external:crypto --outfile=engine.js && node scripts/gen-manifest.mjs",
+    "check":         "tsc --noEmit",
+    "dev":           "tsup --watch",
+    "sync-types":    "node scripts/sync-types.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "esbuild":     "^0.24.0",
+    "tsup":        "^8.0.0",
+    "typescript":  "^5.5.0"
+  }
+}
