@@ -1,4 +1,4 @@
-# Agentic Trader — Strategy Engine Template
+# LiquidDesk — Quantbot Strategy Template
 
 Build a custom quant engine and deploy it to the [Liquid Desk](https://liquiddesk.co) platform for any market.
 
