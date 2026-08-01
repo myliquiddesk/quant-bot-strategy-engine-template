@@ -1,6 +1,6 @@
 # Agentic Trader — Strategy Engine Template
 
-Build a custom quant engine and deploy it to the [Agentic Trader](https://liquiddesk.co) platform.
+Build a custom quant engine and deploy it to the [Liquid Desk](https://liquiddesk.co) platform for any market.
 
 This repo is the official starting point. It ships with a complete reference engine (EMA crossover with RSI filter), the full TypeScript contract, starter agent prompts, and a submission guide.
 
