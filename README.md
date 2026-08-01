@@ -4,6 +4,9 @@ Build a custom quant engine and deploy it to the [Liquid Desk](https://liquiddes
 
 This repo is the official starting point. It ships with a complete reference engine (EMA crossover with RSI filter), the full TypeScript contract, starter agent prompts, and a submission guide.
 
+## How to deploy
+[![Watch the video](https://res.cloudinary.com/estaterally/image/upload/v1785596305/trading_agent_video_cover_etwraw.png)](https://www.youtube.com/watch?v=FaKjFMaf1pI)
+
 ---
 
 ## Quick start
