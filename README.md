@@ -1,6 +1,6 @@
 # LiquidDesk — Quantbot Strategy Template
 
-Build a custom quant engine and deploy it to the [Liquid Desk](https://liquiddesk.co) platform for any market.
+Build a custom quant engine for your trading agent and deploy it to the [Liquid Desk](https://liquiddesk.co) platform for any market.
 
 This repo is the official starting point. It ships with a complete reference engine (EMA crossover with RSI filter), the full TypeScript contract, starter agent prompts, and a submission guide.
 
