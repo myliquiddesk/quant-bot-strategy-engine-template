@@ -7,15 +7,24 @@
  *   SELL — RSI ≥ RSI_EMERGENCY_EXIT (bypassLlm: true — immediate execution, no LLM delay)
  *
  * What this file demonstrates:
- *   ✓ manifest export         — indicator + param declarations for the deployment UI + agent prompts
- *   ✓ ctx.params              — runtime-configurable thresholds, read safely per instance
- *   ✓ ctx.getCandles()        — fetching historical OHLCV
- *   ✓ ctx.computeIndicators() — EMA, RSI, MACD, Bollinger Bands from the platform
- *   ✓ ctx.getOpenPositions()  — position-gating (suppress buys when full)
- *   ✓ ctx.exchangeWs          — live bid/ask from the shared orderbook WebSocket
- *   ✓ ctx.logger              — structured pino-style logging
+ *   ✓ manifest export          — indicator + param declarations for the deployment UI + agent prompts
+ *   ✓ ctx.params               — runtime-configurable thresholds, read safely per instance
+ *   ✓ ctx.exchange.category    — spot vs futures detection ("spot" | "linear")
+ *   ✓ ctx.exchange.leverage    — configured leverage (futures only)
+ *   ✓ ctx.getCandles()         — fetching historical OHLCV
+ *   ✓ ctx.computeIndicators()  — EMA, RSI, MACD, Bollinger Bands from the platform
+ *   ✓ ctx.getOpenPositions()   — position-gating; positionSide distinguishes longs from shorts
+ *   ✓ ctx.exchangeWs           — live bid/ask from the shared orderbook WebSocket
+ *   ✓ ctx.logger               — structured pino-style logging
  *   ✓ signal.flags.bypassLlm  — mechanical exit that skips the agent pipeline entirely
+ *   ✓ Futures intents           — open_long / close_long / open_short / close_short
  *   ✓ Manual Signal construction — explicit and transparent (recommended over ctx.buildSignal)
+ *
+ * New in SDK v2:
+ *   • ctx.exchange.category / leverage — adapt strategy to spot or futures
+ *   • getOpenPositions() returns positionSide + averageFillPrice
+ *   • Signal.indicators can include ATR-based stop/target hints for agent SL/TP
+ *   • Agents honour stopLossPrice / takeProfitPrice / limitPrice / orderSizeUsd output fields
  *
  * Build:
  *   npm run build        — produces engine.js + manifest.json (tsup)

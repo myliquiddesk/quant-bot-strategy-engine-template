@@ -138,10 +138,87 @@ declare module "@agentic-trading/shared" {
 
   export interface OpenPosition {
     id: string;
+    /** Market symbol, e.g. "BTCUSDT". */
+    market: string;
     price: number;
     amount: number;
     openedAt?: number;
     unrealizedPnl?: number | null;
+    /** "long" for spot buys and futures longs; "short" for futures short positions. */
+    positionSide?: "long" | "short";
+    /** Average fill price (may differ from the limit price). */
+    averageFillPrice?: number | null;
+  }
+
+  export interface ExchangeWsContext {
+    connect(): void;
+    subscribe(market: string): void;
+    unsubscribe(market: string): void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    on(event: string, listener: (...args: any[]) => void): void;
+  }
+
+  export interface EngineConfig {
+    bot: {
+      market: string;
+      candleInterval: string;
+      signalIntervalSeconds: number;
+      signalPriceChangeThreshold: number;
+    };
+    risk: {
+      positionProfitExitPct?: number;
+      [key: string]: unknown;
+    };
+    indicators: Record<string, unknown>;
+  }
+
+  export interface EngineLogger {
+    debug(bindings: Record<string, unknown>, msg?: string): void;
+    info(bindings: Record<string, unknown>, msg?: string): void;
+    warn(bindings: Record<string, unknown>, msg?: string): void;
+    error(bindings: Record<string, unknown>, msg?: string): void;
+    child(bindings: Record<string, unknown>): EngineLogger;
+  }
+
+  export interface IndicatorConfig {
+    ema: number[];
+    rsi: { period: number };
+    macd: { fast: number; slow: number; signal: number };
+    bollingerBands: { period: number; stdDev: number };
+    volumeSma: { period: number };
+  }
+
+  export interface TradeEvent {
+    id: string;
+    market: string;
+    price: number;
+    amount: number;
+    timestamp: number;
+  }
+
+  export interface OrderbookUpdate {
+    type: "add" | "update" | "remove";
+    id: string;
+    side: "buy" | "sell";
+    price: number;
+    amount: number;
+    remaining: number;
+    filled: number;
+    timestamp: number;
+  }
+
+  export interface OpenPosition {
+    id: string;
+    /** Market symbol, e.g. "BTCUSDT". */
+    market: string;
+    price: number;
+    amount: number;
+    openedAt?: number;
+    unrealizedPnl?: number | null;
+    /** "long" for spot buys and futures longs; "short" for futures short positions. */
+    positionSide?: "long" | "short";
+    /** Average fill price (may differ from the limit price). */
+    averageFillPrice?: number | null;
   }
 
   export interface ExchangeWsContext {
@@ -179,40 +256,79 @@ declare module "@agentic-trading/shared" {
     logger: EngineLogger;
     /**
      * Active exchange identity — set by the platform at startup.
-     * Allows engines to adapt behaviour per exchange (e.g. market pair format,
-     * order size precision, fee model).
+     * Use ctx.exchange.category to adapt behaviour for spot vs futures.
      */
     exchange: {
-      /** Exchange identifier. e.g. "100x" | "binance" | "bybit" */
+      /** Exchange identifier: "bybit" | "100x" | "binance" | "deriv" */
       id:   string;
-      /** Human-readable exchange name. e.g. "100x Exchange" | "Binance" */
+      /** Human-readable name, e.g. "Bybit" */
       name: string;
+      /**
+       * Trading category — present when the instance is configured for a specific mode.
+       * "spot" = regular spot trading.
+       * "linear" = USDT perpetual futures.
+       * Absent for exchanges that don't distinguish (treat as "spot").
+       *
+       * Use this to emit explicit futures intents:
+       *   isLinear ? "open_long" : "buy"
+       *   isLinear ? "close_long" : "sell"
+       */
+      category?: "spot" | "linear";
+      /**
+       * Configured leverage for this instance (futures only).
+       * 1 = no leverage (spot-equivalent). Absent for spot instances.
+       * Use to scale ATR-based stop distances when designing stops.
+       */
+      leverage?: number;
     };
     /**
-     * Per-instance resolved params (SI4). Preferred over process.env for multi-instance safety.
-     * Built from cascade: InstanceConfig.params → secrets.instances[id] → secrets.global → process.env
-     * Usage: ctx.params.SIGNAL_THRESHOLD ?? process.env.SIGNAL_THRESHOLD ?? "2.0"
-     * process.env remains a valid fallback for backward compatibility.
+     * Per-instance resolved params. Prefer over process.env for multi-instance safety.
+     * Cascade: InstanceConfig.params → instance secrets → global secrets → process.env
      */
     params: Record<string, string>;
     /** Fetch historical OHLCV candles from the exchange REST API. */
     getCandles(market: string, interval: string, limit: number): Promise<Candle[]>;
-    /** Returns currently open long positions (filled buys with no exit sell yet). */
+    /**
+     * Returns all currently open positions for this instance.
+     * Includes both longs (spot buys + futures longs) and shorts (futures shorts).
+     * Check positionSide to distinguish direction.
+     *
+     * @example
+     *   const longs  = ctx.getOpenPositions().filter(p => p.positionSide !== "short");
+     *   const shorts = ctx.getOpenPositions().filter(p => p.positionSide === "short");
+     */
     getOpenPositions(): OpenPosition[];
-    /** Shared exchange WebSocket — engines subscribe to events here. */
+    /** Shared exchange WebSocket — subscribe to live orderbook and trade events. */
     exchangeWs: ExchangeWsContext;
     /**
      * Compute technical indicators from candles + orderbook.
-     * Pass ctx.config.indicators as IndicatorConfig (cast if needed).
-     * Returns ema9, ema21, ema50, rsi14, macdLine, macdSignal, macdHistogram,
-     * bbUpper, bbMiddle, bbLower, volumeSma20, currentVolume, bidAskSpread, bidAskImbalance.
+     * Returns ema9, ema21, ema50, rsi14, macdLine/Signal/Histogram,
+     * bbUpper/Middle/Lower, volumeSma20, currentVolume, bidAskSpread, bidAskImbalance.
      */
     computeIndicators(candles: Candle[], orderbook: Orderbook | null, config: IndicatorConfig): Indicators;
     /**
-     * Build a fully-formed Signal from candles + pre-computed indicators.
-     * Derives action/strength from multi-factor scoring, attaches market snapshot.
+     * Build a fully-formed Signal from candles + indicators.
+     * The platform derives action/strength automatically from a multi-factor score.
+     *
+     * For futures engines, pass explicitAction to emit open_long/close_short etc. directly
+     * instead of relying on the platform's generic buy/sell inference.
+     *
+     * @example — spot engine (platform infers direction)
+     *   const signal = ctx.buildSignal(market, interval, candles, indicators, orderbook);
+     *
+     * @example — futures engine (explicit intent)
+     *   const isLinear = ctx.exchange.category === "linear";
+     *   const action = isLinear ? (bullish ? "open_long" : "open_short") : (bullish ? "buy" : "sell");
+     *   const signal = ctx.buildSignal(market, interval, candles, indicators, orderbook, action);
      */
-    buildSignal(market: string, candleInterval: string, candles: Candle[], indicators: Indicators, orderbook?: Orderbook | null): Signal;
+    buildSignal(
+      market: string,
+      candleInterval: string,
+      candles: Candle[],
+      indicators: Indicators,
+      orderbook?: Orderbook | null,
+      explicitAction?: import("./signal.js").SignalAction,
+    ): Signal;
   }
 
   export interface ParamDefinition {
@@ -269,8 +385,41 @@ declare module "@agentic-trading/shared" {
   export interface IQuantEngine {
     start(): Promise<void>;
     stop(): void;
-    on(event: "signal", listener: (signal: Signal) => void): this;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    on(event: string, listener: (...args: any[]) => void): this;
   }
 
   export type CreateEngine = (ctx: EngineContext) => IQuantEngine;
+
+  export interface RiskManagerData {
+    approved: boolean;
+    reason: string;
+    /** Position size as % of available balance (0.5–100, capped at maxOrderSizePercent). */
+    orderSizePercent?: number;
+    /** Absolute position size in quote currency — overrides orderSizePercent when set. */
+    orderSizeUsd?: number;
+    /**
+     * Absolute stop-loss price.
+     * Honoured when it is on the correct side of the entry and within
+     * the configured agentSlMaxDeviationPct (default 30%) from entry.
+     * Use ATR-based levels from your indicators for meaningful stops.
+     */
+    stopLossPrice?: number;
+    /**
+     * Absolute take-profit price.
+     * Honoured when on the correct side within agentTpMaxDeviationPct (default 50%).
+     */
+    takeProfitPrice?: number;
+    /**
+     * Desired entry limit price.
+     * Overrides bestAsk/bestBid when within agentLimitPriceTightPct (default 2%) of market.
+     */
+    limitPrice?: number;
+    /** Exchange-level trailing stop as fraction of entry price (e.g. 0.015 = 1.5%). */
+    trailingStopPct?: number;
+    /** Override the engine signal direction entirely. Takes precedence over finalDecision. */
+    overrideAction?: "buy" | "sell" | "hold";
+    /** Arbitrary tag stored on the trade record for filtering/analytics (max 64 chars). */
+    tradeLabel?: string;
+  }
 }
