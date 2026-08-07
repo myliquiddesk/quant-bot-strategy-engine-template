@@ -1,6 +1,6 @@
-# LiquidDesk — Quantbot Strategy Template
+# Rocketx — Quantbot Strategy Template
 
-Build a custom quant engine for your trading agent and deploy it to the [Liquid Desk](https://liquiddesk.co) platform for any market.
+Build a custom quant engine for your trading agent and deploy it to the [Rocketx marketplace](https://rocketx.market).
 
 This repo is the official starting point. It ships with a complete reference engine (EMA crossover with RSI filter), the full TypeScript contract, starter agent prompts, and a submission guide.
 
@@ -33,6 +33,11 @@ my-engine/
 ├── AGENTS-template/
 │   ├── market-analyst.md      ← Agent prompt tuned to this engine's indicators
 │   └── risk-manager.md        ← Agent prompt for position sizing + SL/TP
+│
+│   Note: the `executor` agent is a platform-managed system agent.
+│   You do NOT ship an executor.md — the platform provides it.
+│   You CAN inject per-instance instructions via Additional Instructions
+│   in the Agent Pipeline settings.
 ├── types/
 │   └── engine-sdk.d.ts        ← Vendored platform types — do not edit
 ├── scripts/

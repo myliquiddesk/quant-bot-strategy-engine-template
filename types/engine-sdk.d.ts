@@ -180,77 +180,6 @@ declare module "@agentic-trading/shared" {
     child(bindings: Record<string, unknown>): EngineLogger;
   }
 
-  export interface IndicatorConfig {
-    ema: number[];
-    rsi: { period: number };
-    macd: { fast: number; slow: number; signal: number };
-    bollingerBands: { period: number; stdDev: number };
-    volumeSma: { period: number };
-  }
-
-  export interface TradeEvent {
-    id: string;
-    market: string;
-    price: number;
-    amount: number;
-    timestamp: number;
-  }
-
-  export interface OrderbookUpdate {
-    type: "add" | "update" | "remove";
-    id: string;
-    side: "buy" | "sell";
-    price: number;
-    amount: number;
-    remaining: number;
-    filled: number;
-    timestamp: number;
-  }
-
-  export interface OpenPosition {
-    id: string;
-    /** Market symbol, e.g. "BTCUSDT". */
-    market: string;
-    price: number;
-    amount: number;
-    openedAt?: number;
-    unrealizedPnl?: number | null;
-    /** "long" for spot buys and futures longs; "short" for futures short positions. */
-    positionSide?: "long" | "short";
-    /** Average fill price (may differ from the limit price). */
-    averageFillPrice?: number | null;
-  }
-
-  export interface ExchangeWsContext {
-    connect(): void;
-    subscribe(market: string): void;
-    unsubscribe(market: string): void;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    on(event: string, listener: (...args: any[]) => void): void;
-  }
-
-  export interface EngineConfig {
-    bot: {
-      market: string;
-      candleInterval: string;
-      signalIntervalSeconds: number;
-      signalPriceChangeThreshold: number;
-    };
-    risk: {
-      positionProfitExitPct?: number;
-      [key: string]: unknown;
-    };
-    indicators: Record<string, unknown>;
-  }
-
-  export interface EngineLogger {
-    debug(bindings: Record<string, unknown>, msg?: string): void;
-    info(bindings: Record<string, unknown>, msg?: string): void;
-    warn(bindings: Record<string, unknown>, msg?: string): void;
-    error(bindings: Record<string, unknown>, msg?: string): void;
-    child(bindings: Record<string, unknown>): EngineLogger;
-  }
-
   export interface EngineContext {
     config: EngineConfig;
     logger: EngineLogger;
@@ -327,7 +256,7 @@ declare module "@agentic-trading/shared" {
       candles: Candle[],
       indicators: Indicators,
       orderbook?: Orderbook | null,
-      explicitAction?: import("./signal.js").SignalAction,
+      explicitAction?: SignalAction,
     ): Signal;
   }
 
@@ -390,36 +319,4 @@ declare module "@agentic-trading/shared" {
   }
 
   export type CreateEngine = (ctx: EngineContext) => IQuantEngine;
-
-  export interface RiskManagerData {
-    approved: boolean;
-    reason: string;
-    /** Position size as % of available balance (0.5–100, capped at maxOrderSizePercent). */
-    orderSizePercent?: number;
-    /** Absolute position size in quote currency — overrides orderSizePercent when set. */
-    orderSizeUsd?: number;
-    /**
-     * Absolute stop-loss price.
-     * Honoured when it is on the correct side of the entry and within
-     * the configured agentSlMaxDeviationPct (default 30%) from entry.
-     * Use ATR-based levels from your indicators for meaningful stops.
-     */
-    stopLossPrice?: number;
-    /**
-     * Absolute take-profit price.
-     * Honoured when on the correct side within agentTpMaxDeviationPct (default 50%).
-     */
-    takeProfitPrice?: number;
-    /**
-     * Desired entry limit price.
-     * Overrides bestAsk/bestBid when within agentLimitPriceTightPct (default 2%) of market.
-     */
-    limitPrice?: number;
-    /** Exchange-level trailing stop as fraction of entry price (e.g. 0.015 = 1.5%). */
-    trailingStopPct?: number;
-    /** Override the engine signal direction entirely. Takes precedence over finalDecision. */
-    overrideAction?: "buy" | "sell" | "hold";
-    /** Arbitrary tag stored on the trade record for filtering/analytics (max 64 chars). */
-    tradeLabel?: string;
-  }
 }
