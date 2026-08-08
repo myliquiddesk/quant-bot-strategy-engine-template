@@ -4,7 +4,7 @@ role: market_analysis
 active: true
 model: null
 temperature: 0.3
-input: [signal, openPositions, recentMemory, previousAgentOutput, exchangeData]
+input: [signal, openPositions, recentMemory, previousAgentOutput, riskLimits, exchangeData]
 output: [reasoning, recommendation, confidence, data]
 ---
 
