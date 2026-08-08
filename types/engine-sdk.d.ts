@@ -305,6 +305,8 @@ export interface ExchangeExecutionData {
     openInterestValue: number | null;
     fundingRate: number | null;
     nextFundingTime: number | null;
+    /** Signed estimate for currently visible positions: positive = receive, negative = pay. */
+    estimatedFundingPayment: number | null;
   };
   positions: ExchangePositionSnapshot[];
   openOrders: ExchangeOrderSnapshot[];
