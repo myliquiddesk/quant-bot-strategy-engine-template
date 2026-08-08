@@ -258,6 +258,19 @@ export interface ExchangeOrderSnapshot {
   timestamp: number;
 }
 
+export interface FundingPaymentSnapshot {
+  id: string;
+  market: string;
+  timestamp: number;
+  /** Signed cash flow: positive = received, negative = paid. */
+  amount: number;
+  currency: string;
+  rate: number | null;
+  positionSide: "long" | "short" | null;
+  positionSize: number | null;
+  settlementPrice: number | null;
+}
+
 export interface ExchangeExecutionData {
   exchangeId: string;
   market: string;
@@ -290,6 +303,18 @@ export interface ExchangeExecutionData {
     effectiveRate: number | null;
     source: "account" | "paper_config" | "unavailable";
     unit: "fraction";
+  };
+  funding: {
+    /** Current exchange-published rate per settlement. */
+    currentRate: number | null;
+    nextFundingTime: number | null;
+    /** Signed forecast for visible positions: positive = receive, negative = pay. */
+    estimatedPayment: number | null;
+    /** Signed sum of actual historical payments in payments[]. */
+    historicalNetPayment: number | null;
+    historyFrom: number | null;
+    source: "account" | "paper_ledger" | "unavailable";
+    payments: FundingPaymentSnapshot[];
   };
   marketData: {
     lastPrice: number | null;
