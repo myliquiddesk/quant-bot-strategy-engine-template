@@ -14,6 +14,7 @@
  *   ✓ ctx.getCandles()         — fetching historical OHLCV
  *   ✓ ctx.computeIndicators()  — EMA, RSI, MACD, Bollinger Bands from the platform
  *   ✓ ctx.getOpenPositions()   — position-gating; positionSide distinguishes longs from shorts
+ *   ✓ ctx.getExchangeData()    — capabilities, constraints, fees, derivatives data, and contract terms
  *   ✓ ctx.exchangeWs           — live bid/ask from the shared orderbook WebSocket
  *   ✓ ctx.logger               — structured pino-style logging
  *   ✓ signal.flags.bypassLlm  — mechanical exit that skips the agent pipeline entirely
@@ -78,6 +79,8 @@ export const manifest: EngineManifest = {
     spreadPct:           { type: "number", description: "Bid-ask spread as % of mid-price." },
     suggestedEntryPrice: { type: "number", description: "Recommended limit-order price. BUY: bestBid (passive) or bestAsk (aggressive). SELL: bestBid." },
     openPositionCount:   { type: "number", description: "Open positions at signal time. Used by agents to calibrate position sizing." },
+    exchangeContextAvailable: { type: "number", description: "1 when current exchange execution metadata was available; otherwise 0." },
+    mutableProtection:   { type: "number", description: "1 when the exchange can update protection on an existing position." },
   },
 
   params: {
@@ -178,7 +181,7 @@ export default function createEngine(ctx: EngineContext): IQuantEngine {
   // Compute the suggested limit-order price for an entry.
   // BUY:  passive = bestBid (sits in the bid queue); aggressive = bestAsk (fills immediately)
   // SELL: always bestBid — exit quickly against existing bids
-  function suggestEntryPrice(action: "buy" | "sell", fallback: number): number {
+  function suggestEntryPrice(action: "buy" | "sell" | "open_long" | "close_long", fallback: number): number {
     const bid = getBestBid();
     const ask = getBestAsk();
     if (bid === null || ask === null) return fallback;
@@ -191,7 +194,7 @@ export default function createEngine(ctx: EngineContext): IQuantEngine {
     // Auto-switch to aggressive when spread is too wide to sit passively
     const aggressive = spreadPct > maxSpread || fillMode === "aggressive";
 
-    return action === "buy"
+    return action === "buy" || action === "open_long"
       ? (aggressive ? ask : bid)  // buy passive = at bid, aggressive = at ask
       : bid;                      // sell = always at bid for quick execution
   }
@@ -216,6 +219,11 @@ export default function createEngine(ctx: EngineContext): IQuantEngine {
       // Deduplicate: fire once per new closed candle, not on every poll interval
       if (current.time <= lastCandleTime) return;
       lastCandleTime = current.time;
+
+      const exchangeData = await ctx.getExchangeData().catch((error) => {
+        log.warn({ event: "exchange_context_unavailable", err: String(error) }, "Continuing without exchange execution context");
+        return null;
+      });
 
       // ── Standard indicator computation ──────────────────────────────────────
       // computeIndicators always returns ema9 and ema21 (the platform's fixed periods).
@@ -251,31 +259,33 @@ export default function createEngine(ctx: EngineContext): IQuantEngine {
 
       // ── Open position check ──────────────────────────────────────────────────
       const positions    = ctx.getOpenPositions();
-      const openCount    = positions.length;
+      const openLongs    = positions.filter((position) => position.positionSide !== "short");
+      const openCount    = openLongs.length;
       const hasPositions = openCount > 0;
+      const isLinear     = ctx.exchange.category === "linear";
 
       // ── Determine action ─────────────────────────────────────────────────────
-      let action:    "buy" | "sell" | "hold" = "hold";
+      let action:    "buy" | "sell" | "open_long" | "close_long" = isLinear ? "open_long" : "buy";
       let strength   = 0;
       let bypassLlm  = false;
       let summary    = "";
 
       if (rsi !== null && rsi >= rsiEmergency && hasPositions) {
         // RSI hit the extreme threshold — hard exit, no LLM, no agent delay
-        action    = "sell";
+        action    = isLinear ? "close_long" : "sell";
         strength  = 1.0;
         bypassLlm = true;
         summary   = `Emergency sell: RSI ${rsi.toFixed(1)} ≥ ${rsiEmergency}. Immediate exit (bypassLlm).`;
 
       } else if (rsi !== null && rsi >= rsiOverbought && hasPositions) {
         // RSI overbought while holding — profit-exit suggestion, let agents confirm
-        action   = "sell";
+        action   = isLinear ? "close_long" : "sell";
         strength = Math.min((rsi - rsiOverbought) / 10, 1);
         summary  = `RSI overbought at ${rsi.toFixed(1)} — recommend exit via agent pipeline.`;
 
       } else if (crossedUp && openCount < maxPositions && (rsi === null || rsi < rsiOverbought)) {
         // Fast EMA just crossed above slow EMA — buy entry signal
-        action   = "buy";
+        action   = isLinear ? "open_long" : "buy";
         strength = Math.min(Math.abs(crossoverStrength) / 2, 1);
         summary  = `EMA crossover: fast (${ema9?.toFixed(2)}) > slow (${ema21?.toFixed(2)}). RSI ${rsi?.toFixed(1) ?? "n/a"}.`;
 
@@ -308,6 +318,8 @@ export default function createEngine(ctx: EngineContext): IQuantEngine {
           spreadPct,
           suggestedEntryPrice: entryPrice,
           openPositionCount:   openCount,
+          exchangeContextAvailable: exchangeData ? 1 : 0,
+          mutableProtection: exchangeData?.capabilities.mutableProtection ? 1 : 0,
         },
         marketSnapshot: {
           market,
@@ -316,6 +328,8 @@ export default function createEngine(ctx: EngineContext): IQuantEngine {
           bestAsk:        ask,
           timestamp:      Date.now(),
           candleInterval: interval,
+          category:       ctx.exchange.category,
+          exchangeId:     ctx.exchange.id,
         },
         summary,
         flags: bypassLlm ? { bypassLlm: true } : undefined,

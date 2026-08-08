@@ -17,6 +17,7 @@ This guide walks you from a working `engine.js` to a published strategy on the R
 
 ```bash
 # Ensure you are on the version branch/tag you want to submit
+npm run sync-types    # refresh the vendored platform SDK
 npm run build
 npm run check         # must exit 0 before submitting
 
@@ -118,6 +119,7 @@ Users who acquired a previous version continue running it. They see a "Update av
 
 - [ ] `npm run build` exits 0 and produces `engine.js` + `manifest.json`
 - [ ] `npm run check` exits 0 (no TypeScript errors)
+- [ ] `npm run sync-types && npm run check` passes against the current platform SDK
 - [ ] `manifest.version` is bumped from the previous submission
 - [ ] `manifest.indicators` keys exactly match what the engine puts in `Signal.indicators`
 - [ ] All `manifest.params` keys are readable via `ctx.params.KEY ?? process.env.KEY`
@@ -125,6 +127,7 @@ Users who acquired a previous version continue running it. They see a "Update av
 - [ ] `tick()` is wrapped in `try/catch` — errors are logged, not thrown
 - [ ] `engine.stop()` clears all timers and calls `ctx.exchangeWs.unsubscribe(market)`
 - [ ] `AGENTS-template/` has at least `market-analyst.md` and `risk-manager.md` tuned to your indicator set
+- [ ] Futures-aware agents preserve explicit intents and gate leverage/protection actions with `exchangeData.capabilities`
 - [ ] Changelog describes breaking changes (e.g. renamed params, removed indicators)
 
 ---

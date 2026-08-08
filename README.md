@@ -15,6 +15,7 @@ This repo is the official starting point. It ships with a complete reference eng
 git clone https://github.com/YOUR_ORG/quant-bot-strategy-engine-template my-engine
 cd my-engine
 npm install
+npm run sync-types  # refresh vendored SDK from sibling agentic-trading repo
 # Edit src/engine.ts — swap in your strategy logic
 npm run build       # → engine.js + manifest.json
 npm run check       # type-check only (no build output)
@@ -88,7 +89,9 @@ ctx.config.bot.market           // "BTCUSDT" — the market this instance trades
 ctx.config.bot.candleInterval   // "1h" — candle interval for signal computation
 ctx.config.bot.signalIntervalSeconds  // how often your tick() loop fires
 ctx.config.indicators           // cast as IndicatorConfig for computeIndicators()
-ctx.exchange.id                 // "bybit" | "100x" | "binance"
+ctx.exchange.id                 // "bybit" | "100x" | "binance" | "deriv"
+ctx.exchange.category           // "spot" | "linear" when applicable
+ctx.exchange.leverage           // configured Bybit leverage when applicable
 ```
 
 ### `ctx.params` — runtime parameters
@@ -116,12 +119,35 @@ lastCandleTime = current.time;
 
 ### `ctx.getOpenPositions()`
 
-Returns filled buys with no matched exit sell — scoped to this engine + market.
+Returns all open long and short positions scoped to this engine + market. Use `positionSide` to distinguish direction.
 
 ```typescript
 const positions = ctx.getOpenPositions();
-if (positions.length >= maxPositions) return;  // position gate
+const longs = positions.filter((position) => position.positionSide !== "short");
+const shorts = positions.filter((position) => position.positionSide === "short");
 ```
+
+### `ctx.getExchangeData()`
+
+Returns capability-driven execution context without inventing unsupported values:
+
+```typescript
+const exchangeData = await ctx.getExchangeData();
+if (exchangeData?.capabilities.mutableProtection) {
+  // Agents may request updatePositionId with SL/TP protection changes.
+}
+```
+
+The result includes product type, supported intents, tick/quantity constraints, fees, top-of-book and derivative data, current exchange positions/orders, Deriv contract terms, and `unsupportedFields`.
+
+Agent position-management fields are handled by the platform executor:
+
+- `closePositionId`: close one exact long or short.
+- `updatePositionId`: update SL/TP without opening, closing, or resizing.
+- `setLeverage`: Bybit linear only, gated by `capabilities.leverage`.
+- `trailingStopPct`: native trailing protection with `updatePositionId` on Bybit linear.
+
+Mutable protection is currently available on Bybit linear and Deriv `MULTUP`/`MULTDOWN`; paper mode updates simulated position protection.
 
 ### `ctx.computeIndicators(candles, orderbook, config)`
 
@@ -179,6 +205,8 @@ const signal: Signal = {
 };
 emitter.emit("signal", signal);
 ```
+
+For Bybit linear or directional Deriv products, emit exact intents (`open_long`, `close_long`, `open_short`, `close_short`) and preserve them in bundled agent recommendations. Spot engines continue using `buy` and `sell`.
 
 ### `bypassLlm` — skip the agent pipeline
 
