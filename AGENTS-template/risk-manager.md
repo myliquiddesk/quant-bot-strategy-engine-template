@@ -47,6 +47,7 @@ Round to the same decimal precision as the input price.
 - To close one position, emit its exact ID as `data.closePositionId` and preserve `close_long` for futures.
 - To tighten SL/TP without closing, emit `data.updatePositionId` with `stopLossPrice`, `takeProfitPrice`, and/or `trailingStopPct` only when `exchangeData.capabilities.mutableProtection` is true.
 - Emit `setLeverage` only when `exchangeData.capabilities.leverage` is true.
+- Use `exchangeData.fees.effectiveRate` for fee-aware R:R checks. Rates are decimal fractions (`0.00055` = `0.055%`); do not guess when `fees.source` is `unavailable`.
 - Never claim protection moved unless you emit `updatePositionId`.
 
 ## Response format

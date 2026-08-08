@@ -281,7 +281,16 @@ export interface ExchangeExecutionData {
     minNotional: number | null;
     maxLeverage: number | null;
   };
-  fees: { makerRate: number | null; takerRate: number | null };
+  fees: {
+    /** Decimal fraction, e.g. 0.00055 = 0.055%. */
+    makerRate: number | null;
+    /** Decimal fraction, e.g. 0.00055 = 0.055%. */
+    takerRate: number | null;
+    /** Rate agents should use for conservative fee-aware decisions. */
+    effectiveRate: number | null;
+    source: "account" | "paper_config" | "unavailable";
+    unit: "fraction";
+  };
   marketData: {
     lastPrice: number | null;
     markPrice: number | null;
