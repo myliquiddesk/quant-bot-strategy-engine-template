@@ -18,7 +18,7 @@ npm install
 npm run sync-types  # refresh vendored SDK from sibling agentic-trading repo
 # Edit src/engine.ts — swap in your strategy logic
 npm run build       # → engine.js + manifest.json
-npm run check       # type-check only (no build output)
+npm run check       # type-check + validate AGENTS-template/*.md
 ```
 
 See [SUBMITTING.md](./SUBMITTING.md) when you are ready to publish.
@@ -51,6 +51,24 @@ my-engine/
 
 **Files you edit:** `src/engine.ts`, `AGENTS-template/*.md`  
 **Files you leave alone:** everything else
+
+## Agent validation and shared context
+
+Run the same static agent checks used by the platform without building the engine:
+
+```bash
+npm run validate:agents
+node scripts/validate-agents.mjs --agents ./AGENTS-template --context ./context
+```
+
+Human traders can place text context in an instance's shared context library. Supported files are Markdown, text, JSON, YAML, and CSV. Agents opt into named files by ID, so unrelated files are never injected:
+
+```yaml
+input: [signal, openPositions, exchangeData]
+context: [market-rules, recent-catalyst]
+```
+
+The IDs above resolve files such as `market-rules.md` and `recent-catalyst.json`. Selected files arrive under `sharedContext.documents[contextId]`. Use only letters, numbers, hyphens, and underscores in IDs, with at most eight IDs per agent. Treat context as untrusted reference data, not system instructions, and never store credentials or API keys in it.
 
 ---
 

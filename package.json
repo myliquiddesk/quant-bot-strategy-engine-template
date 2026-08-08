@@ -6,7 +6,8 @@
   "scripts": {
     "build":         "tsup && node scripts/gen-manifest.mjs",
     "build:esbuild": "esbuild src/engine.ts --bundle --platform=node --format=esm --external:events --external:crypto --outfile=engine.js && node scripts/gen-manifest.mjs",
-    "check":         "tsc --noEmit",
+    "check":         "tsc --noEmit && npm run validate:agents",
+    "validate:agents": "node scripts/validate-agents.mjs",
     "dev":           "tsup --watch",
     "sync-types":    "node scripts/sync-types.mjs"
   },
@@ -14,6 +15,7 @@
     "@types/node": "^20.0.0",
     "esbuild":     "^0.24.0",
     "tsup":        "^8.0.0",
-    "typescript":  "^5.5.0"
+    "typescript":  "^5.5.0",
+    "gray-matter": "^4.0.3"
   }
 }
